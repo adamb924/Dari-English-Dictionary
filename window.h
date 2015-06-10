@@ -4,43 +4,37 @@
 #include <QMainWindow>
 
 class QSqlDatabase;
-class QLineEdit;
-class QComboBox;
-class QCheckBox;
-class QListWidget;
-class QTextEdit;
 
 #include <QSqlDatabase>
 
-#define GLASSMAN 0
-#define ENGLISH 1
-#define IPA 2
-#define DARI 3
+namespace Ui {
+    class MainWindow;
+}
 
 class Window : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    Window();
+    enum SearchKeys { Glassman, English, Dari, IPA };
+
+    explicit Window(QWidget *parent = 0);
     ~Window();
 
-    inline bool error() const { return bUnrecoverableError; }
+    inline bool error() const { return mUnrecoverableError; }
+
+protected:
+    void keyReleaseEvent(QKeyEvent * event);
 
 private:
-    QLineEdit *searchTextEntry;
-    QComboBox *searchBy;
-    QCheckBox *substringSearch;
-    QListWidget *suggestions;
-    QTextEdit *wordDisplay;
-    QLineEdit *numberToReturn;
+    Ui::MainWindow *ui;
+    QSqlDatabase mDb;
+    bool mUnrecoverableError;
 
-    QSqlDatabase db;
-
-    bool bUnrecoverableError;
+    Window::SearchKeys columnNameForSearching() const;
 
 private slots:
-    void searchByChanged(const QString &str);
+    void searchByChanged();
     void updateDefinition(const QString &str);
     void updateSuggestions();
     void versionInformation();
