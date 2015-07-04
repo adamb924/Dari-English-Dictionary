@@ -1,5 +1,6 @@
 #include <QtWidgets>
 #include <QtSql>
+#include <QtDebug>
 
 #include "window.h"
 #include "ui_mainwindow.h"
@@ -18,11 +19,22 @@ Window::Window(QWidget *parent) :
         mUnrecoverableError=true;
         return;
     }
+
     mDb = QSqlDatabase::addDatabase("QSQLITE");
-    mDb.setDatabaseName("dedic2.db");
+
+    QDir appFolder( QCoreApplication::applicationDirPath() );
+    QString dbPath = appFolder.absoluteFilePath("dedic2.db");
+    if( !appFolder.exists("dedic2.db") )
+    {
+        QMessageBox::critical (this,tr("Error Message"),tr("The database file does not exist (%1)").arg(dbPath) );
+        mUnrecoverableError=true;
+        return;
+    }
+
+    mDb.setDatabaseName( dbPath );
     if(!mDb.open())
     {
-        QMessageBox::information (this,"Error Message","There was a problem in opening the database. The program said: " + mDb.lastError().databaseText() + " It is unlikely that you will solve this on your own. Rather you had better contact the developer." );
+        QMessageBox::critical (this, tr("Error Message"), tr("There was a problem in opening the database. The database said: %1. It is unlikely that you will solve this on your own. Rather you had better contact the developer.").arg(mDb.lastError().databaseText()) );
         mUnrecoverableError=true;
         return;
     }
@@ -239,3 +251,4 @@ void Window::versionInformation()
     }
     QMessageBox::information (this,"Version Information",htmlText);
 }
+
