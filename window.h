@@ -33,6 +33,10 @@ private:
 
     Window::SearchKeys columnNameForSearching() const;
 
+    void searchFromBeginning(const QString &searchString);
+    void searchAnySubstring(const QString &searchString);
+    void searchRegularExpression(const QString &searchString);
+
 private slots:
     void searchByChanged();
     void updateDefinition(const QString &str);

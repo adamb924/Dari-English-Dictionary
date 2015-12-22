@@ -54,10 +54,22 @@
        <widget class="QListWidget" name="listWidget"/>
       </item>
       <item>
-       <widget class="QCheckBox" name="substringCheckBox">
-        <property name="text">
-         <string>Search for any substring</string>
-        </property>
+       <widget class="QComboBox" name="searchMethodCombo">
+        <item>
+         <property name="text">
+          <string>Search from beginning</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Search for any substring</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Search with regular expression</string>
+         </property>
+        </item>
        </widget>
       </item>
       <item>
@@ -78,7 +90,7 @@
            </size>
           </property>
           <property name="text">
-           <string>25</string>
+           <string>250</string>
           </property>
          </widget>
         </item>

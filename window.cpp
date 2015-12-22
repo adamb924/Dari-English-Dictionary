@@ -4,6 +4,27 @@
 
 #include "window.h"
 #include "ui_mainwindow.h"
+#include "sqlite-3.8.8.2/sqlite3.h"
+
+// http://www.qtcentre.org/threads/48969-How-to-create-a-custom-function-in-a-QSqlDatabase-regex-in-sqlite-and-pyqt
+void qtregexp(sqlite3_context* ctx, int argc, sqlite3_value** argv)
+{
+    Q_UNUSED(argc);
+    QRegExp regex;
+    QString str1((const char*)sqlite3_value_text(argv[0]));
+    QString str2((const char*)sqlite3_value_text(argv[1]));
+
+    regex.setPattern(str1);
+    regex.setCaseSensitivity(Qt::CaseInsensitive);
+
+    bool b = str2.contains(regex);
+
+    if (b) {
+        sqlite3_result_int(ctx, 1);
+    } else {
+        sqlite3_result_int(ctx, 0);
+    }
+}
 
 Window::Window(QWidget *parent) :
     QMainWindow(parent),
@@ -39,16 +60,25 @@ Window::Window(QWidget *parent) :
         return;
     }
 
+    // from Qt docs
+    QVariant v = mDb.driver()->handle();
+    if (v.isValid() && qstrcmp(v.typeName(), "sqlite3*")==0) {
+        sqlite3 *sldb = *static_cast<sqlite3 **>(v.data());
+        sqlite3_initialize();
+        if (sldb != 0) {
+            sqlite3_create_function(sldb, "regexp", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC, NULL, &qtregexp, NULL, NULL);
+        }
+    }
+
     ui->numberEdit->setValidator(new QIntValidator(1, 100000, this));
-    ui->numberEdit->setText( tr("%1").arg(25) );
+    ui->numberEdit->setText( tr("%1").arg(250) );
 
     connect(ui->comboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(searchByChanged()));
     connect(ui->listWidget, SIGNAL(currentTextChanged(const QString &)), this, SLOT(updateDefinition(QString)));
     connect(ui->searchEdit, SIGNAL(textEdited(const QString &)), this, SLOT(updateSuggestions()));
-    connect(ui->substringCheckBox, SIGNAL(stateChanged(int)), this, SLOT(updateSuggestions()));
     connect(ui->numberEdit, SIGNAL(textEdited(const QString &)), this, SLOT(updateSuggestions()));
     connect(ui->versionButton, SIGNAL(clicked(bool)), this, SLOT(versionInformation()));
-    connect(ui->substringCheckBox, SIGNAL(clicked(bool)), ui->numberEdit, SLOT(setEnabled(bool)));
+    connect(ui->searchMethodCombo, SIGNAL(currentTextChanged(QString)), this, SLOT(updateSuggestions()) );
 
     ui->searchEdit->setFocus();
 }
@@ -62,12 +92,18 @@ void Window::keyReleaseEvent(QKeyEvent *event)
 {
     QMainWindow::keyReleaseEvent(event);
     int key = event->key();
-    if( key >= Qt::Key_F1 && key <= Qt::Key_F35 )
+    if( key >= Qt::Key_F1 && key <= Qt::Key_F4 )
     {
         key -= Qt::Key_F1; // now F1 is zero, F2 is one, etc.
         if( key < ui->comboBox->count() )
         {
             ui->comboBox->setCurrentIndex(key);
+        }
+    } else if ( key >= Qt::Key_F10 && key <= Qt::Key_F12 ) {
+        key -= Qt::Key_F10;
+        if( key < ui->searchMethodCombo->count() )
+        {
+            ui->searchMethodCombo->setCurrentIndex(key);
         }
     }
 }
@@ -171,29 +207,43 @@ void Window::updateSuggestions()
 {
     ui->listWidget->clear();
 
-    QString str = ui->searchEdit->text();
+    QString searchString = ui->searchEdit->text();
 
-    if(str.isEmpty())
+    if(searchString.isEmpty())
         return;
 
-    if(!str.length()) { return; }
+    if(!searchString.length()) { return; }
 
+    if( ui->searchMethodCombo->currentText() == tr("Search from beginning") ) {
+        searchFromBeginning(searchString);
+    } else if ( ui->searchMethodCombo->currentText() == tr("Search for any substring") ) {
+        searchFromBeginning(searchString);
+        searchAnySubstring(searchString);
+    } else if ( ui->searchMethodCombo->currentText() == tr("Search with regular expression") ) {
+        searchRegularExpression(searchString);
+    }
+
+    ui->listWidget->verticalScrollBar()->setSliderPosition(0);
+}
+
+void Window::searchFromBeginning(const QString & searchString )
+{
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
 
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
-        query.exec( QString("select glassman from dari where substr(glassman,1,%1)='%2' order by glassman limit %3;").arg(str.length()).arg(str).arg(maxRows));
+        query.exec( QString("select glassman from dari where substr(glassman,1,%1)='%2' order by glassman limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     case Window::English:
-        query.exec( QString("select english from english where substr(english,1,%1)='%2' order by english limit %3;").arg(str.length()).arg(str).arg(maxRows));
+        query.exec( QString("select english from english where substr(english,1,%1)='%2' order by english limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     case Window::IPA:
-        query.exec( QString("select ipa from dari where substr(ipa,1,%1)='%2' order by ipa limit %3;").arg(str.length()).arg(str).arg(maxRows));
+        query.exec( QString("select ipa from dari where substr(ipa,1,%1)='%2' order by ipa limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     case Window::Dari:
-        query.exec( QString("select persian from dic where substr(persian,1,%1)='%2' order by persian limit %3;").arg(str.length()).arg(str).arg(maxRows));
+        query.exec( QString("select persian from dic where substr(persian,1,%1)='%2' order by persian limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     }
     if( ! query.exec() )
@@ -202,41 +252,71 @@ void Window::updateSuggestions()
         return;
     }
 
-    int remainingRows = maxRows;
     while(query.next())
     {
         ui->listWidget->addItem(query.value(0).toString());
-        remainingRows--;
     }
+}
 
-    if(ui->substringCheckBox->isChecked() && str.length()>1 && remainingRows > 0 )
+void Window::searchAnySubstring(const QString &searchString)
+{
+    QSqlQuery query;
+    int remainingRows = ui->numberEdit->text().toInt() - ui->listWidget->count();
+    if( searchString.length()>1 && remainingRows > 0 )
     {
         switch( columnNameForSearching() )
         {
         case Window::Glassman:
-            query.prepare( QString("select distinct glassman from dari where glassman like '%_%1%' order by glassman limit %2;").arg(str).arg(remainingRows) );
+            query.prepare( QString("select distinct glassman from dari where glassman like '%_%1%' order by glassman limit %2;").arg(searchString).arg(remainingRows) );
             break;
         case Window::English:
-            query.prepare( QString("select distinct english from english where english like '%_%1%' order by english limit %2;").arg(str).arg(remainingRows) );
+            query.prepare( QString("select distinct english from english where english like '%_%1%' order by english limit %2;").arg(searchString).arg(remainingRows) );
             break;
         case Window::IPA:
-            query.prepare( QString("select distinct ipa from dari where ipa like '%_%1%' order by ipa limit %2;").arg(str).arg(remainingRows) );
+            query.prepare( QString("select distinct ipa from dari where ipa like '%_%1%' order by ipa limit %2;").arg(searchString).arg(remainingRows) );
             break;
         case Window::Dari:
-            query.prepare( QString("select distinct dari from dari where dari like '%_%1%' order by dari limit %2;").arg(str).arg(remainingRows) );
+            query.prepare( QString("select distinct dari from dari where dari like '%_%1%' order by dari limit %2;").arg(searchString).arg(remainingRows) );
             break;
         }
         if( ! query.exec() )
         {
             qWarning() << query.lastError();
         }
-        while(query.next())
+        while(query.next() )
         {
             ui->listWidget->addItem(query.value(0).toString());
         }
     }
+}
 
-    ui->listWidget->verticalScrollBar()->setSliderPosition(0);
+void Window::searchRegularExpression(const QString &searchString)
+{
+    QSqlQuery query;
+    int maxRows = ui->numberEdit->text().toInt();
+    switch( columnNameForSearching() )
+    {
+    case Window::Glassman:
+        query.prepare( QString("select distinct glassman from dari where regexp('%1',glassman) order by glassman limit %2;").arg(searchString).arg(maxRows) );
+        break;
+    case Window::English:
+        query.prepare( QString("select distinct english from english where regexp('%1',english) order by english limit %2;").arg(searchString).arg(maxRows) );
+        break;
+    case Window::IPA:
+        query.prepare( QString("select distinct ipa from dari where regexp('%1',ipa) order by ipa limit %2;").arg(searchString).arg(maxRows) );
+        break;
+    case Window::Dari:
+        query.prepare( QString("select distinct dari from dari where regexp('%1',dari) order by dari limit %2;").arg(searchString).arg(maxRows) );
+        break;
+    }
+    if( ! query.exec() )
+    {
+        qWarning() << query.lastError();
+    }
+    while(query.next()  )
+    {
+        ui->listWidget->addItem(query.value(0).toString());
+    }
 }
 
 void Window::versionInformation()
@@ -251,4 +331,3 @@ void Window::versionInformation()
     }
     QMessageBox::information (this,"Version Information",htmlText);
 }
-
