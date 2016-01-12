@@ -226,10 +226,12 @@ void Window::updateSuggestions()
     ui->listWidget->verticalScrollBar()->setSliderPosition(0);
 }
 
-void Window::searchFromBeginning(const QString & searchString )
+void Window::searchFromBeginning(QString searchString)
 {
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
+
+    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
 
     switch( columnNameForSearching() )
     {
@@ -258,10 +260,13 @@ void Window::searchFromBeginning(const QString & searchString )
     }
 }
 
-void Window::searchAnySubstring(const QString &searchString)
+void Window::searchAnySubstring(QString searchString)
 {
     QSqlQuery query;
     int remainingRows = ui->numberEdit->text().toInt() - ui->listWidget->count();
+
+    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
+
     if( searchString.length()>1 && remainingRows > 0 )
     {
         switch( columnNameForSearching() )
@@ -290,10 +295,13 @@ void Window::searchAnySubstring(const QString &searchString)
     }
 }
 
-void Window::searchRegularExpression(const QString &searchString)
+void Window::searchRegularExpression(QString searchString)
 {
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
+
+    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
+
     switch( columnNameForSearching() )
     {
     case Window::Glassman:

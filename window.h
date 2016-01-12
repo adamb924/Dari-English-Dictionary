@@ -33,9 +33,9 @@ private:
 
     Window::SearchKeys columnNameForSearching() const;
 
-    void searchFromBeginning(const QString &searchString);
-    void searchAnySubstring(const QString &searchString);
-    void searchRegularExpression(const QString &searchString);
+    void searchFromBeginning(QString searchString);
+    void searchAnySubstring(QString searchString);
+    void searchRegularExpression(QString searchString);
 
 private slots:
     void searchByChanged();
