@@ -231,21 +231,21 @@ void Window::searchFromBeginning(QString searchString)
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
 
-    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
+//    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
 
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
-        query.exec( QString("select glassman from dari where substr(glassman,1,%1)='%2' order by glassman limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.exec( QString("select glassman from dari where substr(replace(glassman,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by glassman limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     case Window::English:
-        query.exec( QString("select english from english where substr(english,1,%1)='%2' order by english limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.exec( QString("select english from english where substr(replace(english,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by english limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     case Window::IPA:
-        query.exec( QString("select ipa from dari where substr(ipa,1,%1)='%2' order by ipa limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.exec( QString("select ipa from dari where substr(replace(ipa,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by ipa limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     case Window::Dari:
-        query.exec( QString("select persian from dic where substr(persian,1,%1)='%2' order by persian limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.exec( QString("select persian from dic where substr(replace(persian,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by persian limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
         break;
     }
     if( ! query.exec() )
@@ -265,23 +265,24 @@ void Window::searchAnySubstring(QString searchString)
     QSqlQuery query;
     int remainingRows = ui->numberEdit->text().toInt() - ui->listWidget->count();
 
-    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
+//    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
+
 
     if( searchString.length()>1 && remainingRows > 0 )
     {
         switch( columnNameForSearching() )
         {
         case Window::Glassman:
-            query.prepare( QString("select distinct glassman from dari where glassman like '%_%1%' order by glassman limit %2;").arg(searchString).arg(remainingRows) );
+            query.prepare( QString("select distinct glassman from dari where replace(glassman,'g','ɡ') like replace('%_%1%','g','ɡ') order by glassman limit %2;").arg(searchString).arg(remainingRows) );
             break;
         case Window::English:
-            query.prepare( QString("select distinct english from english where english like '%_%1%' order by english limit %2;").arg(searchString).arg(remainingRows) );
+            query.prepare( QString("select distinct english from english where replace(english,'g','ɡ') like replace('%_%1%','g','ɡ') order by english limit %2;").arg(searchString).arg(remainingRows) );
             break;
         case Window::IPA:
-            query.prepare( QString("select distinct ipa from dari where ipa like '%_%1%' order by ipa limit %2;").arg(searchString).arg(remainingRows) );
+            query.prepare( QString("select distinct ipa from dari where replace(ipa,'g','ɡ') like replace('%_%1%','g','ɡ') order by ipa limit %2;").arg(searchString).arg(remainingRows) );
             break;
         case Window::Dari:
-            query.prepare( QString("select distinct dari from dari where dari like '%_%1%' order by dari limit %2;").arg(searchString).arg(remainingRows) );
+            query.prepare( QString("select distinct dari from dari where replace(dari,'g','ɡ') like replace('%_%1%','g','ɡ') order by dari limit %2;").arg(searchString).arg(remainingRows) );
             break;
         }
         if( ! query.exec() )
@@ -300,21 +301,21 @@ void Window::searchRegularExpression(QString searchString)
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
 
-    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
+//    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
 
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
-        query.prepare( QString("select distinct glassman from dari where regexp('%1',glassman) order by glassman limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct glassman from dari where regexp('%1',replace(glassman,'g','ɡ')) order by glassman limit %2;").arg(searchString).arg(maxRows) );
         break;
     case Window::English:
-        query.prepare( QString("select distinct english from english where regexp('%1',english) order by english limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct english from english where regexp('%1',replace(english,'g','ɡ')) order by english limit %2;").arg(searchString).arg(maxRows) );
         break;
     case Window::IPA:
-        query.prepare( QString("select distinct ipa from dari where regexp('%1',ipa) order by ipa limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct ipa from dari where regexp('%1',replace(ipa,'g','ɡ')) order by ipa limit %2;").arg(searchString).arg(maxRows) );
         break;
     case Window::Dari:
-        query.prepare( QString("select distinct dari from dari where regexp('%1',dari) order by dari limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct dari from dari where regexp('%1',replace(dari,'g','ɡ')) order by dari limit %2;").arg(searchString).arg(maxRows) );
         break;
     }
     if( ! query.exec() )
