@@ -18,7 +18,7 @@ class Window : public QMainWindow
 public:
     enum SearchKeys { Glassman, English, Dari, IPA };
 
-    explicit Window(QWidget *parent = 0);
+    explicit Window(QWidget *parent = nullptr);
     ~Window();
 
     inline bool error() const { return mUnrecoverableError; }

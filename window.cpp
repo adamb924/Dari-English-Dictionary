@@ -15,7 +15,7 @@ Window::Window(QWidget *parent) :
 
     if(!QSqlDatabase::isDriverAvailable("QSQLITE"))
     {
-        QMessageBox::critical (0,"Fatal error", "The driver for the database is not available. It is unlikely that you will solve this on your own. Rather you had better contact the developer.");
+        QMessageBox::critical (nullptr,"Fatal error", "The driver for the database is not available. It is unlikely that you will solve this on your own. Rather you had better contact the developer.");
         mUnrecoverableError=true;
         return;
     }
@@ -233,9 +233,6 @@ void Window::searchAnySubstring(QString searchString)
 {
     QSqlQuery query;
     int remainingRows = ui->numberEdit->text().toInt() - ui->listWidget->count();
-
-//    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
-
 
     if( searchString.length()>1 && remainingRows > 0 )
     {
