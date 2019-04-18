@@ -4,27 +4,6 @@
 
 #include "window.h"
 #include "ui_mainwindow.h"
-#include "sqlite-3.8.8.2/sqlite3.h"
-
-// http://www.qtcentre.org/threads/48969-How-to-create-a-custom-function-in-a-QSqlDatabase-regex-in-sqlite-and-pyqt
-void qtregexp(sqlite3_context* ctx, int argc, sqlite3_value** argv)
-{
-    Q_UNUSED(argc);
-    QRegExp regex;
-    QString str1((const char*)sqlite3_value_text(argv[0]));
-    QString str2((const char*)sqlite3_value_text(argv[1]));
-
-    regex.setPattern(str1);
-    regex.setCaseSensitivity(Qt::CaseInsensitive);
-
-    bool b = str2.contains(regex);
-
-    if (b) {
-        sqlite3_result_int(ctx, 1);
-    } else {
-        sqlite3_result_int(ctx, 0);
-    }
-}
 
 Window::Window(QWidget *parent) :
     QMainWindow(parent),
@@ -52,22 +31,14 @@ Window::Window(QWidget *parent) :
         return;
     }
 
+    mDb.setConnectOptions("QSQLITE_ENABLE_REGEXP");
+
     mDb.setDatabaseName( dbPath );
     if(!mDb.open())
     {
         QMessageBox::critical (this, tr("Error Message"), tr("There was a problem in opening the database. The database said: %1. It is unlikely that you will solve this on your own. Rather you had better contact the developer.").arg(mDb.lastError().databaseText()) );
         mUnrecoverableError=true;
         return;
-    }
-
-    // from Qt docs
-    QVariant v = mDb.driver()->handle();
-    if (v.isValid() && qstrcmp(v.typeName(), "sqlite3*")==0) {
-        sqlite3 *sldb = *static_cast<sqlite3 **>(v.data());
-        sqlite3_initialize();
-        if (sldb != 0) {
-            sqlite3_create_function(sldb, "regexp", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC, NULL, &qtregexp, NULL, NULL);
-        }
     }
 
     ui->numberEdit->setValidator(new QIntValidator(1, 100000, this));
@@ -231,8 +202,6 @@ void Window::searchFromBeginning(QString searchString)
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
 
-//    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
-
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
@@ -301,21 +270,19 @@ void Window::searchRegularExpression(QString searchString)
     QSqlQuery query;
     int maxRows = ui->numberEdit->text().toInt();
 
-//    searchString.replace("g","ɡ"); // 0x0067 v. 0x0261
-
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
-        query.prepare( QString("select distinct glassman from dari where regexp('%1',replace(glassman,'g','ɡ')) order by glassman limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct glassman from dari where replace(glassman,'g','ɡ') REGEXP '%1' order by glassman limit %2;").arg(searchString).arg(maxRows) );
         break;
     case Window::English:
-        query.prepare( QString("select distinct english from english where regexp('%1',replace(english,'g','ɡ')) order by english limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct english from english where replace(english,'g','ɡ') REGEXP '%1' order by english limit %2;").arg(searchString).arg(maxRows) );
         break;
     case Window::IPA:
-        query.prepare( QString("select distinct ipa from dari where regexp('%1',replace(ipa,'g','ɡ')) order by ipa limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct ipa from dari where replace(ipa,'g','ɡ') REGEXP '%1' order by ipa limit %2;").arg(searchString).arg(maxRows) );
         break;
     case Window::Dari:
-        query.prepare( QString("select distinct dari from dari where regexp('%1',replace(dari,'g','ɡ')) order by dari limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( QString("select distinct dari from dari where replace(dari,'g','ɡ') REGEXP '%1' order by dari limit %2;").arg(searchString).arg(maxRows) );
         break;
     }
     if( ! query.exec() )

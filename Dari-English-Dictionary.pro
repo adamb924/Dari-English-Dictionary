@@ -1,8 +1,6 @@
-HEADERS += window.h \
-    sqlite-3.8.8.2\sqlite3.h
+HEADERS += window.h
 SOURCES += window.cpp \
-    main.cpp \
-    sqlite-3.8.8.2\sqlite3.c
+    main.cpp
 QT += sql widgets
 CONFIG += x86 ppc x86_64 ppc64
 
