@@ -4,6 +4,7 @@
 #include <QMainWindow>
 
 class QSqlDatabase;
+class QSqlQueryModel;
 
 #include <QSqlDatabase>
 
@@ -31,6 +32,8 @@ private:
     QSqlDatabase mDb;
     bool mUnrecoverableError;
 
+    QSqlQueryModel * mQueryModel;
+
     Window::SearchKeys columnNameForSearching() const;
 
     void searchFromBeginning(QString searchString);
@@ -39,7 +42,7 @@ private:
 
 private slots:
     void searchByChanged();
-    void updateDefinition(const QString &str);
+    void updateDefinition(const QModelIndex & index);
     void updateSuggestions();
     void versionInformation();
 };

@@ -1,6 +1,7 @@
 #include <QtWidgets>
 #include <QtSql>
 #include <QtDebug>
+#include <QListView>
 
 #include "window.h"
 #include "ui_mainwindow.h"
@@ -41,13 +42,13 @@ Window::Window(QWidget *parent) :
         return;
     }
 
-    ui->numberEdit->setValidator(new QIntValidator(1, 100000, this));
-    ui->numberEdit->setText( tr("%1").arg(250) );
+    mDb.exec("PRAGMA case_sensitive_like=ON;");
+
+    mQueryModel = new QSqlQueryModel;
 
     connect(ui->comboBox, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(searchByChanged()));
-    connect(ui->listWidget, SIGNAL(currentTextChanged(const QString &)), this, SLOT(updateDefinition(QString)));
+    connect(ui->listView, SIGNAL(clicked(const QModelIndex &)), this, SLOT(updateDefinition(const QModelIndex &)));
     connect(ui->searchEdit, SIGNAL(textEdited(const QString &)), this, SLOT(updateSuggestions()));
-    connect(ui->numberEdit, SIGNAL(textEdited(const QString &)), this, SLOT(updateSuggestions()));
     connect(ui->versionButton, SIGNAL(clicked(bool)), this, SLOT(versionInformation()));
     connect(ui->searchMethodCombo, SIGNAL(currentTextChanged(QString)), this, SLOT(updateSuggestions()) );
 
@@ -113,9 +114,11 @@ void Window::searchByChanged()
     updateSuggestions();
 }
 
-void Window::updateDefinition(const QString &str)
+void Window::updateDefinition(const QModelIndex &index)
 {
-    if(str.isEmpty())
+    QString string = mQueryModel->record( index.row() ).value(0).toString();
+
+    if(string.isEmpty())
     {
         ui->textEdit->setHtml("<html></html>");
         return;
@@ -141,10 +144,10 @@ void Window::updateDefinition(const QString &str)
         break;
     }
 
-    query.bindValue(0, str);
+    query.bindValue(0, string);
     if( !query.exec() )
     {
-        qWarning() << query.lastError() << str << ui->comboBox->currentIndex() << query.executedQuery();
+        qWarning() << query.lastError() << string << ui->comboBox->currentIndex() << query.executedQuery();
     }
 
     while(query.next())
@@ -176,8 +179,6 @@ void Window::updateDefinition(const QString &str)
 
 void Window::updateSuggestions()
 {
-    ui->listWidget->clear();
-
     QString searchString = ui->searchEdit->text();
 
     if(searchString.isEmpty())
@@ -188,107 +189,122 @@ void Window::updateSuggestions()
     if( ui->searchMethodCombo->currentText() == tr("Search from beginning") ) {
         searchFromBeginning(searchString);
     } else if ( ui->searchMethodCombo->currentText() == tr("Search for any substring") ) {
-        searchFromBeginning(searchString);
         searchAnySubstring(searchString);
     } else if ( ui->searchMethodCombo->currentText() == tr("Search with regular expression") ) {
         searchRegularExpression(searchString);
     }
-
-    ui->listWidget->verticalScrollBar()->setSliderPosition(0);
 }
 
 void Window::searchFromBeginning(QString searchString)
 {
     QSqlQuery query;
-    int maxRows = ui->numberEdit->text().toInt();
 
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
-        query.exec( QString("select glassman from dari where substr(replace(glassman,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by glassman limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.prepare( "select distinct glassman from dari where glassman LIKE ?||'%' order by glassman;" );
         break;
     case Window::English:
-        query.exec( QString("select english from english where substr(replace(english,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by english limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.prepare( "select distinct english from english where english LIKE ?||'%' order by english;" );
         break;
     case Window::IPA:
-        query.exec( QString("select ipa from dari where substr(replace(ipa,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by ipa limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.prepare( "select distinct ipa from dari where replace(ipa,'ɡ','g') LIKE ?||'%' order by ipa;" );
         break;
     case Window::Dari:
-        query.exec( QString("select persian from dic where substr(replace(persian,'g','ɡ'),1,%1)=replace('%2','g','ɡ') order by persian limit %3;").arg(searchString.length()).arg(searchString).arg(maxRows));
+        query.prepare( "select distinct dari from dari where dari LIKE ?||'%' order by dari;" );
         break;
     }
-    if( ! query.exec() )
+    query.bindValue(0, searchString);
+    if( query.exec() )
+    {
+        mQueryModel->setQuery(query);
+        ui->listView->setModel(mQueryModel);
+    }
+    else
     {
         qWarning() << query.lastError();
         return;
-    }
-
-    while(query.next())
-    {
-        ui->listWidget->addItem(query.value(0).toString());
     }
 }
 
 void Window::searchAnySubstring(QString searchString)
 {
     QSqlQuery query;
-    int remainingRows = ui->numberEdit->text().toInt() - ui->listWidget->count();
+    QString queryString = "SELECT DISTINCT tablename,1 AS orderingTerm FROM tablename WHERE replace(tablename,'g','ɡ') LIKE ?||'%' "
+                          "UNION "
+                          "SELECT DISTINCT tablename,2 AS orderingTerm FROM tablename WHERE replace(tablename,'g','ɡ') LIKE '_'||?||'%' "
+                          "ORDER BY orderingTerm ASC,tablename;";
 
-    if( searchString.length()>1 && remainingRows > 0 )
+    switch( columnNameForSearching() )
     {
-        switch( columnNameForSearching() )
-        {
-        case Window::Glassman:
-            query.prepare( QString("select distinct glassman from dari where replace(glassman,'g','ɡ') like replace('%_%1%','g','ɡ') order by glassman limit %2;").arg(searchString).arg(remainingRows) );
-            break;
-        case Window::English:
-            query.prepare( QString("select distinct english from english where replace(english,'g','ɡ') like replace('%_%1%','g','ɡ') order by english limit %2;").arg(searchString).arg(remainingRows) );
-            break;
-        case Window::IPA:
-            query.prepare( QString("select distinct ipa from dari where replace(ipa,'g','ɡ') like replace('%_%1%','g','ɡ') order by ipa limit %2;").arg(searchString).arg(remainingRows) );
-            break;
-        case Window::Dari:
-            query.prepare( QString("select distinct dari from dari where replace(dari,'g','ɡ') like replace('%_%1%','g','ɡ') order by dari limit %2;").arg(searchString).arg(remainingRows) );
-            break;
-        }
-        if( ! query.exec() )
-        {
-            qWarning() << query.lastError();
-        }
-        while(query.next() )
-        {
-            ui->listWidget->addItem(query.value(0).toString());
-        }
+    case Window::Glassman:
+        query.prepare( "SELECT DISTINCT glassman,1 AS orderingTerm FROM dari WHERE glassman LIKE ?||'%' "
+                       "UNION "
+                       "SELECT DISTINCT glassman,2 AS orderingTerm FROM dari WHERE glassman LIKE '%_'||?||'%' "
+                       "ORDER BY orderingTerm ASC,glassman;" );
+        break;
+    case Window::English:
+        query.prepare( "SELECT DISTINCT english,1 AS orderingTerm FROM english WHERE english LIKE ?||'%' "
+                       "UNION "
+                       "SELECT DISTINCT english,2 AS orderingTerm FROM english WHERE english LIKE '%_'||?||'%' "
+                       "ORDER BY orderingTerm ASC,english;" );
+        break;
+    case Window::IPA:
+        query.prepare( "SELECT DISTINCT ipa,1 AS orderingTerm FROM dari WHERE replace(ipa,'ɡ','g') LIKE ?||'%' "
+                       "UNION "
+                       "SELECT DISTINCT ipa,2 AS orderingTerm FROM dari WHERE replace(ipa,'ɡ','g') LIKE '%_'||?||'%' "
+                       "ORDER BY orderingTerm ASC,ipa;" );
+        break;
+    case Window::Dari:
+        query.prepare( "SELECT DISTINCT dari,1 AS orderingTerm FROM dari WHERE dari LIKE ?||'%' "
+                       "UNION "
+                       "SELECT DISTINCT dari,2 AS orderingTerm FROM dari WHERE dari LIKE '%_'||?||'%' "
+                       "ORDER BY orderingTerm ASC,dari;" );
+        break;
+    }
+    query.bindValue(0, searchString);
+    query.bindValue(1, searchString);
+    if( query.exec() )
+    {
+        mQueryModel->setQuery(query);
+        ui->listView->setModel(mQueryModel);
+    }
+    else
+    {
+        qWarning() << query.lastError();
+        return;
     }
 }
 
 void Window::searchRegularExpression(QString searchString)
 {
     QSqlQuery query;
-    int maxRows = ui->numberEdit->text().toInt();
 
     switch( columnNameForSearching() )
     {
     case Window::Glassman:
-        query.prepare( QString("select distinct glassman from dari where replace(glassman,'g','ɡ') REGEXP '%1' order by glassman limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( "select distinct glassman from dari where glassman REGEXP ? order by glassman;" );
         break;
     case Window::English:
-        query.prepare( QString("select distinct english from english where replace(english,'g','ɡ') REGEXP '%1' order by english limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( "select distinct english from english where english REGEXP ? order by english;" );
         break;
     case Window::IPA:
-        query.prepare( QString("select distinct ipa from dari where replace(ipa,'g','ɡ') REGEXP '%1' order by ipa limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( "select distinct ipa from dari where replace(ipa,'ɡ','g') REGEXP ? order by ipa;" );
         break;
     case Window::Dari:
-        query.prepare( QString("select distinct dari from dari where replace(dari,'g','ɡ') REGEXP '%1' order by dari limit %2;").arg(searchString).arg(maxRows) );
+        query.prepare( "select distinct dari from dari where dari REGEXP ? order by dari;" );
         break;
     }
-    if( ! query.exec() )
+    query.bindValue(0, searchString);
+    if( query.exec() )
+    {
+        mQueryModel->setQuery(query);
+        ui->listView->setModel(mQueryModel);
+    }
+    else
     {
         qWarning() << query.lastError();
-    }
-    while(query.next()  )
-    {
-        ui->listWidget->addItem(query.value(0).toString());
+        return;
     }
 }
 
