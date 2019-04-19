@@ -6,8 +6,6 @@
 class QSqlDatabase;
 class QSqlQueryModel;
 
-#include <QSqlDatabase>
-
 namespace Ui {
     class MainWindow;
 }
@@ -29,7 +27,6 @@ protected:
 
 private:
     Ui::MainWindow *ui;
-    QSqlDatabase mDb;
     bool mUnrecoverableError;
 
     QSqlQueryModel * mQueryModel;

@@ -2,6 +2,7 @@
 #include <QtSql>
 #include <QtDebug>
 #include <QListView>
+#include <QSqlDatabase>
 
 #include "window.h"
 #include "ui_mainwindow.h"
@@ -21,7 +22,7 @@ Window::Window(QWidget *parent) :
         return;
     }
 
-    mDb = QSqlDatabase::addDatabase("QSQLITE");
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
 
     QDir appFolder( QCoreApplication::applicationDirPath() );
     QString dbPath = appFolder.absoluteFilePath("dedic2.db");
@@ -32,17 +33,17 @@ Window::Window(QWidget *parent) :
         return;
     }
 
-    mDb.setConnectOptions("QSQLITE_ENABLE_REGEXP");
+    db.setConnectOptions("QSQLITE_ENABLE_REGEXP");
 
-    mDb.setDatabaseName( dbPath );
-    if(!mDb.open())
+    db.setDatabaseName( dbPath );
+    if(!db.open())
     {
-        QMessageBox::critical (this, tr("Error Message"), tr("There was a problem in opening the database. The database said: %1. It is unlikely that you will solve this on your own. Rather you had better contact the developer.").arg(mDb.lastError().databaseText()) );
+        QMessageBox::critical (this, tr("Error Message"), tr("There was a problem in opening the database. The database said: %1. It is unlikely that you will solve this on your own. Rather you had better contact the developer.").arg(db.lastError().databaseText()) );
         mUnrecoverableError=true;
         return;
     }
 
-    mDb.exec("PRAGMA case_sensitive_like=ON;");
+    db.exec("PRAGMA case_sensitive_like=ON;");
 
     mQueryModel = new QSqlQueryModel;
 
@@ -57,7 +58,7 @@ Window::Window(QWidget *parent) :
 
 Window::~Window()
 {
-    mDb.close();
+    QSqlDatabase::database().close();
 }
 
 void Window::keyReleaseEvent(QKeyEvent *event)
