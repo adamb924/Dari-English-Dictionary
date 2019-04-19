@@ -13,12 +13,9 @@ Window::Window(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    mUnrecoverableError=false;
-
     if(!QSqlDatabase::isDriverAvailable("QSQLITE"))
     {
         QMessageBox::critical (nullptr,"Fatal error", "The driver for the database is not available. It is unlikely that you will solve this on your own. Rather you had better contact the developer.");
-        mUnrecoverableError=true;
         return;
     }
 
@@ -28,8 +25,7 @@ Window::Window(QWidget *parent) :
     QString dbPath = appFolder.absoluteFilePath("dedic2.db");
     if( !appFolder.exists("dedic2.db") )
     {
-        QMessageBox::critical (this,tr("Error Message"),tr("The database file does not exist (%1)").arg(dbPath) );
-        mUnrecoverableError=true;
+        QMessageBox::critical (this,tr("Error Message"),tr("The database file does not exist. I was looking for: %1").arg(dbPath) );
         return;
     }
 
@@ -39,7 +35,6 @@ Window::Window(QWidget *parent) :
     if(!db.open())
     {
         QMessageBox::critical (this, tr("Error Message"), tr("There was a problem in opening the database. The database said: %1. It is unlikely that you will solve this on your own. Rather you had better contact the developer.").arg(db.lastError().databaseText()) );
-        mUnrecoverableError=true;
         return;
     }
 

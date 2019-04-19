@@ -20,14 +20,11 @@ public:
     explicit Window(QWidget *parent = nullptr);
     ~Window();
 
-    inline bool error() const { return mUnrecoverableError; }
-
 protected:
     void keyReleaseEvent(QKeyEvent * event);
 
 private:
     Ui::MainWindow *ui;
-    bool mUnrecoverableError;
 
     QSqlQueryModel * mQueryModel;
 
